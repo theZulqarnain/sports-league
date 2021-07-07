@@ -1,116 +1,56 @@
 import React, { Fragment, useEffect, useMemo, useState } from 'react';
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import DataTable from 'react-data-table-component'
 import ReactPaginate from 'react-paginate'
-import { ChevronDown, Plus } from 'react-feather'
-import { Card, CardHeader, CardBody, CardTitle, Input, Label, FormGroup, Row, Col, Badge, Button, CustomInput } from 'reactstrap'
-import { useHistory } from 'react-router';
+import { ChevronDown, Plus, X, Trash2 } from 'react-feather'
+import { Card, Form, Row, Col, Button, Badge,Alert } from 'react-bootstrap'
+import Select from "react-select"
+import { AddPlayerToTeamHandler, AddTeamHandler, DeletePlayerFromTeamHandler, RemoveTeamHandler } from '../../redux/actions/teamsAction'
 
-import styled from "styled-components";
-
-// const Input = styled.input.attrs(props => ({
-//   type: "text",
-//   size: props.small ? 5 : undefined
-// }))`
-//   height: 32px;
-//   width: 200px;
-//   border-radius: 3px;
-//   border-top-left-radius: 5px;
-//   border-bottom-left-radius: 5px;
-//   border-top-right-radius: 0;
-//   border-bottom-right-radius: 0;
-//   border: 1px solid #e5e5e5;
-//   padding: 0 32px 0 16px;
-// `;
-
-const ClearButton = styled.button`
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  border-top-right-radius: 5px;
-  border-bottom-right-radius: 5px;
-  height: 34px;
-  width: 32px;
-  text-align: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-`;
-const FilterComponent = ({ filterText, onFilter, onClear }) => (
-    <Row className='w-100'>
-        <Col sm='10'>
-            <Input
-                id="search"
-                type="text"
-                placeholder="Filter table data..."
-                value={filterText}
-                onChange={onFilter}
-            />
-        </Col>
-        <Col sm='2'>
-            <ClearButton onClick={onClear}>X</ClearButton>
-        </Col>
-    </Row>
-  );
+import ModalComponent from '../../components/ModalComponent';
 
 const TeamsView = () => {
     const { Teams } = useSelector((state) => state.Team);
     const { Players } = useSelector((state) => state.Player)
+    const dispatch = useDispatch()
 
     const [teamsData, setTeamsData] = useState({})
     const [searchName, setSearchName] = useState("")
     const [filterText, setFilterText] = useState("");
-  const [resetPaginationToggle, setResetPaginationToggle] = useState(
-    false
-  );
-    // ** Function to toggle sidebar
-    useEffect(() => {
-        const teamsInfo = {};
-        for (const key in Teams) {
-            if (Object.hasOwnProperty.call(Teams, key)) {
-                const team = Teams[key];
-                team.players.map((playerId, i) => {
-                    if (Players[playerId]) {
-                        if (teamsInfo[team.name]) {
-                            teamsInfo[team.name].push(Players[playerId])
-                        } else {
-                            teamsInfo[team.name] = []
-                            teamsInfo[team.name].push(Players[playerId])
-                        }
-                    }
-                })
-            }
-        }
-        if (Object.keys(teamsData).length === 0) {
-            setTeamsData(teamsInfo)
-        }
-    }, [])
-    const subHeaderComponent = useMemo(() => {
-        const handleClear = () => {
-          if (filterText) {
-            setResetPaginationToggle(!resetPaginationToggle);
-            setFilterText("");
-          }
-        };
-    
+    const [resetPaginationToggle, setResetPaginationToggle] = useState(false);
+    const [currentPlayer,setCurrentPlayer] = useState({})
+    const [newPlayer,setNewPlayer] = useState("")
+    const [currentTeam,setCurrentTeam] = useState({})
+    const [newTeam,setNewTeam] = useState("")
+    const [modalState, setModalState] = useState(false)
+    const [modalType, setModalType] = useState("")
+    useEffect(()=>{
+        TeamsGen()
+    },[Teams])
+    const subHeaderComponent = (team) =>{
         return (
             <Row className='w-100'>
-                <Col sm='10'>
-                    <FilterComponent
-                        onFilter={e => setFilterText(e.target.value)}
-                        onClear={handleClear}
-                        filterText={filterText}
-                    />
+                <Col sm='6'>
                 </Col>
-                <Col sm='2'>
-                {/* <Button color="primary">success</Button>{' '} */}
-                    <Button className="d-flex align-self-center" color="primary" onClick={()=>{}}>
-                        <Plus size={14} />
-                        New Player
-                    </Button>
+                <Col sm='6'>
+                    <div className="d-flex align-self-center justify-content-end">
+                        <Button className="d-flex align-self-center align-items-center mr-1" variant="primary" onClick={()=>ModalStateHandler(team,'add_player')}>
+                        <div className="d-flex align-items-center justify-content-center">
+                            <Plus size={14} />
+                            <p style={{fontSize:12,marginLeft:1,marginBottom:0}}>Add Player</p>
+                        </div>
+                        </Button>
+                        <Button className="d-flex align-self-center align-items-center" variant="danger" onClick={()=>ModalStateHandler(team,'remove_team')}>
+                            <div className="d-flex align-items-center justify-content-center">
+                                <Trash2 size={14} />
+                                <p style={{fontSize:12,marginLeft:1,marginBottom:0}}>Remove Team</p>
+                            </div>
+                        </Button>
+                    </div>
                 </Col>
             </Row>
         );
-    }, [filterText, resetPaginationToggle]);
+    }
 
     const advSearchColumns = [
         {
@@ -123,16 +63,29 @@ const TeamsView = () => {
             name: 'Name',
             selector: 'name',
             sortable: true,
-            minWidth: '70px'
+            minWidth: '200px'
         },
         {
             name: "Action",
             button: true,
-            cell: row => <button onClick={() => console.log(row.name)}>Delete</button>
+            minWidth: '100px',
+            cell: row => (
+                <Badge variant="danger" className="p-1 cusor-pointer" onClick={()=>ModalStateHandler(row,'delete_player')}>
+                    <div className="d-flex align-items-center justify-content-center">
+                        <Trash2 size={14} />
+                        <p style={{fontSize:12,marginLeft:1,marginBottom:0}}>Delete</p>
+                    </div>
+                </Badge>
+                // <Button className="my-2"  variant="danger" onClick={()=>ModalStateHandler(row,'delete_player')}>
+                //     <div className="d-flex align-items-center justify-content-center">
+                //         <Trash2 size={14} />
+                //         <p style={{fontSize:12,marginLeft:1,marginBottom:0}}>Delete</p>
+                //     </div>
+                // </Button>
+            )
           }
     ]
 
-    console.log(teamsData, 'teamsData');
     const BootyCheckbox = React.forwardRef(({ onClick, ...rest }, ref) => (
         <div className="custom-control custom-checkbox">
             <input
@@ -144,52 +97,169 @@ const TeamsView = () => {
             <label className="custom-control-label" onClick={onClick} />
         </div>
     ));
-    const filteredItems = teamsData['Sunrisers Hyderabad'] && teamsData['Sunrisers Hyderabad'].filter(
-        item =>
-          JSON.stringify(item)
-            .toLowerCase()
-            .indexOf(filterText.toLowerCase()) !== -1
-      );
+
+    const TeamsGen = () => {
+        const list = [];
+        for (const key in Teams) {
+            const players = []
+            if (Object.hasOwnProperty.call(Teams, key)) {
+                const team = Teams[key];
+                team.players.map((playerId, i) => {
+                    if (Players[playerId]) {
+                        const player = Players[playerId]
+                        player['teamId'] = key
+                        players.push(player)
+                    }
+                })
+                list.push(
+                    <Col sm="6">
+                        <Card style={{margin:10}} key={key}>
+                        <DataTable
+                            title={Teams[key].name}
+                            columns={advSearchColumns}
+                            data={players.filter(
+                                item =>
+                                  JSON.stringify(item)
+                                    .toLowerCase()
+                                    .indexOf(filterText.toLowerCase()) !== -1
+                            )}
+                            defaultSortField="name"
+                            pagination
+                            selectableRows
+                            subHeader
+                            selectableRowsComponent={BootyCheckbox}
+                            highlightOnHover={true}
+                            pointerOnHover={true}
+                            subHeaderComponent={subHeaderComponent(Teams[key])}
+                            subHeaderWrap={true}
+                            className='react-dataTable'
+                        />
+                    </Card>
+                </Col>
+                )
+            }
+        }
+        return (
+            <Row>
+                {list}
+            </Row>
+        );
+    }
+
+    const ModalStateHandler = (data,type) =>{
+        if(type === 'delete_player'){
+            setCurrentPlayer(data)
+            setModalType('delete_player')
+        }
+
+        if(type === 'add_player'){
+            setCurrentTeam(data)
+            setModalType('add_player')
+        } else if( type === 'remove_team'){
+            setCurrentTeam(data)
+            setModalType('remove_team')
+        }else if( type === 'add_team'){
+            setModalType('add_team')
+        }
+        setModalState(true)
+        
+    }
+    const ModalHandler = () =>{
+        if(modalType === 'delete_player'){
+            if(currentPlayer && Object.keys(currentPlayer).length){
+                dispatch(DeletePlayerFromTeamHandler(currentPlayer))
+                setModalState(false)
+                setCurrentPlayer("")
+            }
+        }else if(modalType === 'add_player'){
+            dispatch(AddPlayerToTeamHandler(newPlayer,currentTeam.id))
+            setModalState(false)
+            setNewPlayer({})
+            setCurrentTeam({})
+        } else if( modalType ===  'remove_team'){
+            dispatch(RemoveTeamHandler(currentTeam.id))
+            setModalState(false)
+        }else if( modalType === 'add_team'){
+            dispatch(AddTeamHandler(newTeam))
+            setModalState(false)
+            setNewTeam("")
+        }
+        
+    }
+
+    const modalHeaderGen = () =>{
+        if(modalType === 'delete_player' || modalType === 'remove_team'){
+            return "Confirmation!"
+        } else if(modalType === 'add_player'){
+            return"Add New Player"
+        }else if( modalType === 'add_team'){
+            return"Add New Team"
+        }
+    }
+    const modalContentGen = () =>{
+        if(modalType === 'delete_player'){
+            return(
+                <Alert variant="danger">
+                    Do you wants to delete {currentPlayer.name} Player
+                </Alert>
+            )
+        } else if(modalType === 'add_player'){
+            
+            return(
+                <Form>
+                    <Form.Group controlId="exampleForm.ControlInput1">
+                        <Form.Control type="text" placeholder="Player Name" value={newPlayer} onChange={(e)=>setNewPlayer(e.target.value)}/>
+                    </Form.Group>
+                </Form>
+            )
+        }else if(modalType === 'remove_team'){
+            return(
+                <Alert variant="danger">
+                    Do you wants to delete {currentTeam.name} Team
+                </Alert>
+            )
+        } else if( modalType === 'add_team'){
+            return(
+                <Form>
+                    <Form.Group controlId="exampleForm.ControlInput1">
+                        <Form.Control type="text" placeholder="Team Name" value={newTeam} onChange={(e)=>setNewTeam(e.target.value)}/>
+                    </Form.Group>
+                </Form>
+            )
+        }
+    }
+
+    const modalSubmitTxtGen = () =>{
+        if(modalType === 'delete_player'){
+            return "Delete"
+        } else if(modalType === 'add_player'){
+            return"Add Player"
+        }else if(modalType === 'remove_team'){
+            return"Remove Team"
+        } else if( modalType === 'add_team'){
+            return"Add Team"
+        }
+    }
     return (
         <Fragment>
-            <Card>
-                {/* <CardHeader className='border-bottom'>
-                    <CardTitle tag='h4'>Plan Initiatives</CardTitle>
-                    <div className="actions">
-                        <Button.Ripple className="d-flex align-self-center" color="primary" onClick={() => {
-
-                        }}>
-                            <Plus size={14} />
-                            New Player
-                        </Button.Ripple>
+            <div className="d-flex justify-content-end px-3 mt-3">
+                <Button className="d-flex align-self-center align-items-center" variant="primary" size="lg" onClick={()=>ModalStateHandler('','add_team')}>
+                    <div className="d-flex align-items-center justify-content-center">
+                        <Plus size={14} />
+                        <p style={{fontSize:14,marginLeft:1,marginBottom:0}}>Add New Team</p>
                     </div>
-                </CardHeader> */}
-                {/* <CardBody>
-                    <Row form className='mt-1 mb-50'>
-                        <Col lg='4' md='3'>
-                            <FormGroup>
-                                <Label for='name'>Search by Name:</Label>
-                                <Input id='name' placeholder='Enter Player Name' value={searchName}  />
-                            </FormGroup>
-                        </Col>
-
-                    </Row>
-                </CardBody> */}
-                <DataTable
-                    title="Teams"
-                    columns={advSearchColumns}
-                    data={filteredItems}
-                    defaultSortField="name"
-                    pagination
-                    selectableRows
-                    subHeader
-                    selectableRowsComponent={BootyCheckbox}
-                    highlightOnHover={true}
-                    pointerOnHover={true}
-                    subHeaderComponent={subHeaderComponent}
-                    className='react-dataTable'
-                />
-            </Card>
+                </Button>
+            </div>
+            {TeamsGen()}
+            <ModalComponent
+                show={modalState}
+                handleClose ={()=>setModalState(!modalState)}
+                header={modalHeaderGen()}
+                subBtnText ={modalSubmitTxtGen()}
+                handleSubmit = {ModalHandler}
+            >
+                {modalContentGen()}
+            </ModalComponent>
         </Fragment>
     )
 }

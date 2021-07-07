@@ -8,28 +8,21 @@ import Home from "../views/home";
 import PlayersView from "../views/players";
 import TeamsView from "../views/teams";
 import { HomeRoute, TeamsRoute, PlayersRoute} from "./Routes"
+import { Navbar,Nav } from 'react-bootstrap'
 
 const Router = () => {
 
     return (
         <AppRouter>
+            <Navbar bg="primary" variant="dark">
+                <Navbar.Brand to="/">Sports League Roaster</Navbar.Brand>
+                <Nav className="mr-auto">
+                    <Nav.Link as={Link} to="/">Home</Nav.Link>
+                    <Nav.Link as={Link} to={TeamsRoute}>Teams</Nav.Link>
+                    <Nav.Link as={Link} to={PlayersRoute}>Players</Nav.Link>
+                </Nav>
+            </Navbar>
             <div>
-                <nav>
-                    <ul>
-                        <li>
-                            <Link to="/">Home</Link>
-                        </li>
-                        <li>
-                            <Link to={TeamsRoute}>Teams</Link>
-                        </li>
-                        <li>
-                            <Link to={PlayersRoute}>Players</Link>
-                        </li>
-                    </ul>
-                </nav>
-
-                {/* A <Switch> looks through its children <Route>s and
-            renders the first one that matches the current URL. */}
                 <Switch>
                     <Route path={TeamsRoute}>
                         <TeamsView />
